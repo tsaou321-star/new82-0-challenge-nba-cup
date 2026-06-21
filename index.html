@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>NBA CUP — Draft & Playoff Simulator</title>
+  <meta name="description" content="Draft all-time NBA legends, simulate an 82-game season, and compete in a Best-of-7 playoff bracket to crown the NBA CUP champion!" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ===================== TOAST ===================== -->
+<div id="toast" class="toast"></div>
+
+<!-- ===================== SCREEN: SETUP ===================== -->
+<div id="screen-setup" class="screen active">
+  <div class="app-header">
+    <div class="logo-badge">
+      <div class="logo-icon">🏀</div>
+      <div class="logo-title">NBA CUP</div>
+    </div>
+    <div class="logo-sub">Draft · Simulate · Champion</div>
+  </div>
+
+  <div class="setup-hero">
+    <h1>Build Your<br><span>All-Time</span> Roster.</h1>
+    <p>
+      Draft legendary NBA players across every era, simulate your 82-game regular season,
+      and battle through the playoffs to claim the <strong style="color:var(--gold)">NBA CUP</strong>!
+    </p>
+  </div>
+
+  <!-- How it works -->
+  <div style="display:flex;gap:16px;max-width:700px;width:100%;flex-wrap:wrap;justify-content:center;">
+    <div class="card" style="flex:1;min-width:180px;text-align:center;padding:20px 16px;">
+      <div style="font-size:2rem;margin-bottom:8px;">🎰</div>
+      <div style="font-weight:700;font-size:0.95rem;margin-bottom:6px;">Phase 1 — Draft</div>
+      <div style="font-size:0.8rem;color:var(--text-secondary);line-height:1.5;">
+        Spin for random team &amp; decade. Pick 5 legends to build your roster and earn your regular season record.
+      </div>
+    </div>
+    <div class="card" style="flex:1;min-width:180px;text-align:center;padding:20px 16px;">
+      <div style="font-size:2rem;margin-bottom:8px;">📊</div>
+      <div style="font-weight:700;font-size:0.95rem;margin-bottom:6px;">Season Simulation</div>
+      <div style="font-size:0.8rem;color:var(--text-secondary);line-height:1.5;">
+        Your team rating determines your 82-game record. Top 4 teams advance to the playoffs!
+      </div>
+    </div>
+    <div class="card" style="flex:1;min-width:180px;text-align:center;padding:20px 16px;">
+      <div style="font-size:2rem;margin-bottom:8px;">🏆</div>
+      <div style="font-weight:700;font-size:0.95rem;margin-bottom:6px;">Phase 2 — Playoffs</div>
+      <div style="font-size:0.8rem;color:var(--text-secondary);line-height:1.5;">
+        Best-of-7 semifinals and finals. Simulate game by game or skip to the series result.
+      </div>
+    </div>
+  </div>
+
+  <!-- Team count selection -->
+  <div style="text-align:center;max-width:520px;width:100%;">
+    <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:3px;color:var(--text-muted);font-weight:700;margin-bottom:16px;">
+      Select Number of Teams
+    </div>
+    <div class="team-count-grid" id="team-count-grid"></div>
+    <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:12px;">
+      Each team goes through a 5-round draft. Top 4 teams play the playoffs.
+    </div>
+  </div>
+
+  <!-- Custom Team Names Container -->
+  <div id="team-names-container" class="team-names-customizer"></div>
+
+  <button class="btn btn-primary" id="btn-start-game" style="min-width:220px;font-size:1rem;">
+    🏀 Start NBA CUP
+  </button>
+</div>
+
+<!-- ===================== SCREEN: DRAFT ===================== -->
+<div id="screen-draft" class="screen">
+  <!-- Phase Banner -->
+  <div class="phase-banner" style="max-width:900px;width:100%;">
+    <div class="phase-tag" id="phase-label">PHASE 1: DRAFT</div>
+    <div class="phase-info">
+      <h2 id="phase-title">Team 1 of 4 — Round 1/5</h2>
+      <p id="phase-desc">Spin to get your team &amp; decade</p>
+    </div>
+    <div class="phase-progress" id="phase-progress"></div>
+  </div>
+
+  <!-- Round Header -->
+  <div class="round-info" style="max-width:900px;width:100%;">
+    <div class="round-label" id="round-label">Round 1 / 5</div>
+    <div class="round-title" id="round-title">Team 1</div>
+    <div class="round-pos-badge" id="round-pos-badge">🔵 PG — Point Guard</div>
+  </div>
+
+  <!-- Draft Layout: slot machine + roster -->
+  <div class="draft-layout">
+    <!-- LEFT: Slot machine + player list -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <!-- Slot Machine -->
+      <div class="card slot-machine">
+        <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:2px;color:var(--text-muted);font-weight:700;text-align:center;margin-bottom:4px;">
+          Spin to unlock players
+        </div>
+        <div class="slot-container">
+          <div class="slot-reel">
+            <div class="slot-label">Team</div>
+            <div class="slot-value" id="slot-team">---</div>
+            <div class="slot-color-bar" id="slot-team-bar"></div>
+          </div>
+          <div class="slot-reel">
+            <div class="slot-label">Decade</div>
+            <div class="slot-value" id="slot-decade">---</div>
+            <div class="slot-color-bar" style="background:var(--orange);"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;width:100%;">
+          <button class="btn btn-primary" id="btn-spin" style="flex:1;">🎰 Spin</button>
+        </div>
+        <div id="draft-actions-container" style="display:flex;gap:12px;width:100%;margin-top:8px;">
+          <!-- Dynamic draft buttons will be inserted here -->
+        </div>
+        <div style="display:flex;gap:12px;width:100%;margin-top:8px;">
+          <button class="btn btn-secondary" id="btn-reroll-team" style="flex:1;" disabled>🔄 Change Team</button>
+          <button class="btn btn-secondary" id="btn-reroll-decade" style="flex:1;" disabled>📅 Change Era</button>
+        </div>
+      </div>
+
+      <!-- Player List -->
+      <div class="card" style="padding:16px;">
+        <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:2px;color:var(--text-muted);font-weight:700;margin-bottom:12px;">
+          Available Players
+        </div>
+        <div id="player-list-area">
+          <div class="no-players">
+            <div class="emoji">🎰</div>
+            <p>Spin the wheel to see available players</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Roster Panel -->
+    <div class="card" style="padding:16px;">
+      <div id="roster-panel" class="roster-panel">
+        <div class="roster-header">
+          <div class="roster-title">Current Roster</div>
+          <div class="team-rating-badge">⭐ --</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SCREEN: RESULTS ===================== -->
+<div id="screen-results" class="screen">
+  <div class="app-header">
+    <div class="logo-badge">
+      <div class="logo-icon">🏀</div>
+      <div class="logo-title">NBA CUP</div>
+    </div>
+  </div>
+
+  <div style="text-align:center;max-width:900px;width:100%;">
+    <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:3px;color:var(--orange);font-weight:700;margin-bottom:8px;">
+      PHASE 1 COMPLETE
+    </div>
+    <h2 id="results-title" style="font-family:'Outfit',sans-serif;font-size:1.8rem;font-weight:900;letter-spacing:-1px;margin-bottom:6px;">
+      Regular Season Results
+    </h2>
+    <p id="results-sub" style="color:var(--text-secondary);font-size:0.9rem;">
+      Top 4 teams advance to the playoffs!
+    </p>
+  </div>
+
+  <div class="results-grid" id="results-grid"></div>
+
+  <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+    <div style="display:flex;align-items:center;gap:8px;padding:12px 20px;background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.3);border-radius:12px;">
+      <span style="font-size:1.2rem;">🏆</span>
+      <span style="font-size:0.85rem;color:var(--gold);font-weight:600;">Seeds #1–4 have qualified for the NBA CUP Playoffs!</span>
+    </div>
+    <button class="btn btn-gold" id="btn-to-playoffs" style="min-width:240px;font-size:1rem;">
+      🏆 Start Playoffs →
+    </button>
+  </div>
+</div>
+
+<!-- ===================== SCREEN: PLAYOFFS ===================== -->
+<div id="screen-playoffs" class="screen">
+  <div class="app-header">
+    <div class="logo-badge">
+      <div class="logo-icon">🏆</div>
+      <div class="logo-title">Playoffs</div>
+    </div>
+    <div class="logo-sub">Best of 7 Series · Semi-Finals &amp; Finals</div>
+  </div>
+
+  <div style="max-width:900px;width:100%;text-align:center;margin-bottom:8px;">
+    <p style="color:var(--text-secondary);font-size:0.85rem;">
+      Click <strong style="color:var(--orange)">Simulate Game</strong> to play one game at a time,
+      or <strong style="color:var(--orange)">Simulate Series</strong> to instantly decide the series winner.
+    </p>
+  </div>
+
+  <div class="bracket-container" id="bracket-container"></div>
+</div>
+
+<!-- ===================== SCREEN: CHAMPION ===================== -->
+<div id="screen-champion" class="screen">
+  <div class="trophy-animation">🏆</div>
+
+  <div style="text-align:center;">
+    <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:4px;color:var(--gold);font-weight:800;margin-bottom:8px;">
+      NBA CUP Champion
+    </div>
+    <div style="font-size:1rem;color:var(--text-secondary);">Congratulations!</div>
+  </div>
+
+  <div class="champion-card">
+    <div class="champion-label">🏆 NBA CUP CHAMPION</div>
+    <div class="champion-name" id="champion-name">Team Name</div>
+    <div class="champion-record" id="champion-record"></div>
+    <div id="champion-series" style="font-size:0.85rem;color:var(--gold);font-weight:700;margin-top:6px;"></div>
+
+    <div class="divider" style="margin:20px 0;"></div>
+
+    <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:2px;color:var(--text-muted);font-weight:700;margin-bottom:10px;">
+      Championship Roster
+    </div>
+    <div id="champion-players" style="display:flex;flex-direction:column;gap:6px;"></div>
+  </div>
+
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
+    <button class="btn btn-primary" id="btn-play-again" style="min-width:200px;">
+      🔄 Play Again
+    </button>
+  </div>
+
+  <!-- Stars background -->
+  <div style="position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0;" id="stars-bg"></div>
+</div>
+
+<!-- ===================== MODAL: MANAGE PLAYER ===================== -->
+<div id="modal-manage-player" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 id="manage-player-title">Manage Player</h3>
+      <button class="modal-close" id="btn-close-manage">×</button>
+    </div>
+    <div class="modal-body">
+      <p id="manage-player-positions" style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px;text-align:center;"></p>
+      <div id="manage-actions-container" class="btn-action-group"></div>
+    </div>
+  </div>
+</div>
+
+<script src="database.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
