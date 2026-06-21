@@ -427,14 +427,7 @@ function renderPlayerList(players) {
       <div class="player-avatar">${positionEmoji(primaryPos)}</div>
       <div class="player-info">
         <div class="player-name">${player.name}</div>
-        <div class="player-meta">${player.team.toUpperCase()} · ${player.decade} · Eligible: ${player.positions.join(', ')}</div>
-        <div class="player-stats">
-          <div class="stat-chip">PPG <span>${player.ppg}</span></div>
-          <div class="stat-chip">RPG <span>${player.rpg}</span></div>
-          <div class="stat-chip">APG <span>${player.apg}</span></div>
-          <div class="stat-chip">SPG <span>${player.spg}</span></div>
-          <div class="stat-chip">BPG <span>${player.bpg}</span></div>
-        </div>
+        <div class="player-meta">${player.positions.join('/')} · ${player.ppg}pts ${player.rpg}reb ${player.apg}ast</div>
       </div>
       <div class="player-rating" style="color:${ratingColor(r)}">${r}</div>
     `;
