@@ -37,6 +37,22 @@ function ratingColor(r) {
   return '#8888aa';
 }
 
+function ratingToGrade(r) {
+  if (r >= 95) return 'S';
+  if (r >= 90) return 'A';
+  if (r >= 85) return 'B';
+  if (r >= 80) return 'C';
+  return 'D';
+}
+
+function gradeColor(g) {
+  if (g === 'S') return '#ffd700'; // Gold
+  if (g === 'A') return '#ff9500'; // Orange
+  if (g === 'B') return '#4488ff'; // Blue
+  if (g === 'C') return '#4cd964'; // Green
+  return '#8888aa'; // Gray
+}
+
 function recordString(wins, losses) {
   return `${wins}-${losses}`;
 }
@@ -59,8 +75,8 @@ function renderTeamNameInputs(count) {
   container.innerHTML = '';
   
   const defaultNames = [
-    "Lakers", "Celtics", "Bulls", "Warriors", "Spurs", 
-    "Heat", "Knicks", "Pistons", "Jazz", "Suns"
+    "阿潘", "阿祥", "伯哥", "還有我啊~", "真的很想融入", 
+    "漸行漸遠", "我跟你講一個秘密", "0", "1", "2"
   ];
   
   for (let i = 0; i < count; i++) {
@@ -80,7 +96,7 @@ function initSetup() {
   showScreen('screen-setup');
   const grid = document.getElementById('team-count-grid');
   grid.innerHTML = '';
-  [3, 4, 6, 8, 10].forEach(n => {
+  [3, 4, 5, 6, 7, 8, 9].forEach(n => {
     const btn = document.createElement('button');
     btn.className = 'team-count-btn' + (n === state.numTeams ? ' selected' : '');
     btn.innerHTML = `<span class="num">${n}</span><span class="label">Teams</span>`;
@@ -123,6 +139,8 @@ function initDraft() {
   state.hasSpun = false;
   state.hasRerolledTeam = false;
   state.hasRerolledDecade = false;
+  state.availablePlayers = [];
+  state.selectedPlayer = null;
 
   updateDraftUI();
   updateRerollButtons();
@@ -150,7 +168,8 @@ function updateRerollButtons() {
 
   btnSpin.disabled = state.hasSpun;
   btnRerollTeam.disabled = !state.hasSpun || state.hasRerolledTeam;
-  btnRerollDecade.disabled = !state.hasSpun || state.hasRerolledDecade;
+// 💡 修正：因為只有一個年代，讓重骰年代按鈕永遠處於禁用狀態（disabled）
+  btnRerollDecade.disabled = true;
 }
 
 function updateDraftUI() {
@@ -201,6 +220,8 @@ function spinSlots() {
   decadeSlot.textContent = '???';
   teamSlot.classList.add('spinning');
   decadeSlot.classList.add('spinning');
+  state.availablePlayers = [];
+  state.selectedPlayer = null;
   document.getElementById('player-list-area').innerHTML =
     '<div class="no-players"><div class="emoji">🎰</div><p>Spinning the wheel...</p></div>';
 
@@ -229,18 +250,27 @@ function spinSlots() {
         finalTeam = getRandomTeam();
         finalDecade = getRandomDecade();
         candidates = getPlayersForTeamAndDecade(finalTeam.id, finalDecade)
-          .filter(p => !state.draftedPlayerIds.has(p.id) && p.positions.some(pos => emptyPositions.includes(pos)));
+          .filter(p => !state.draftedPlayerIds.has(p.id));
+        const hasEligible = candidates.some(p => p.positions.some(pos => emptyPositions.includes(pos)));
         attempts++;
-      } while (candidates.length === 0 && attempts < 60);
+      } while ((candidates.length === 0 || !hasEligible) && attempts < 60);
 
       // Fallback: Pick any team/decade that has eligible players for the empty slots
-      if (candidates.length === 0) {
-        candidates = PLAYERS.filter(p => !state.draftedPlayerIds.has(p.id) && p.positions.some(pos => emptyPositions.includes(pos)));
-        if (candidates.length > 0) {
-          finalTeam = getTeamById(candidates[0].team) || finalTeam;
-          finalDecade = candidates[0].decade || finalDecade;
+      // Fallback: 隨機挑選一個有 eligible 球員的組合，不再固定抓第一個
+      if (candidates.length === 0 || !candidates.some(p => p.positions.some(pos => emptyPositions.includes(pos)))) {
+        const allValidCandidates = PLAYERS.filter(p => !state.draftedPlayerIds.has(p.id) && p.positions.some(pos => emptyPositions.includes(pos)));
+        
+        if (allValidCandidates.length > 0) {
+          // 💡 修正點：從所有符合資格的球員中，隨機抽一個 index
+          const randomIdx = Math.floor(Math.random() * allValidCandidates.length);
+          const luckyPlayer = allValidCandidates[randomIdx];
+
+          finalTeam = getTeamById(luckyPlayer.team) || finalTeam;
+          finalDecade = luckyPlayer.decade || finalDecade;
+          
+          // 重新過濾出該球隊與年代的所有候選人
           candidates = getPlayersForTeamAndDecade(finalTeam.id, finalDecade)
-            .filter(p => !state.draftedPlayerIds.has(p.id) && p.positions.some(pos => emptyPositions.includes(pos)));
+            .filter(p => !state.draftedPlayerIds.has(p.id));
         }
       }
 
@@ -267,6 +297,8 @@ function rerollTeam() {
 
   teamSlot.textContent = '???';
   teamSlot.classList.add('spinning');
+  state.availablePlayers = [];
+  state.selectedPlayer = null;
   document.getElementById('player-list-area').innerHTML =
     '<div class="no-players"><div class="emoji">🎰</div><p>Spinning Team...</p></div>';
 
@@ -317,7 +349,7 @@ function rerollTeam() {
 
       state.currentSlotTeam = finalTeam;
       const candidates = getPlayersForTeamAndDecade(finalTeam.id, state.currentSlotDecade)
-        .filter(p => !state.draftedPlayerIds.has(p.id) && p.positions.some(pos => emptyPositions.includes(pos)));
+        .filter(p => !state.draftedPlayerIds.has(p.id));
 
       state.availablePlayers = candidates;
       teamSlot.textContent = finalTeam.name;
@@ -337,6 +369,8 @@ function rerollDecade() {
 
   decadeSlot.textContent = '???';
   decadeSlot.classList.add('spinning');
+  state.availablePlayers = [];
+  state.selectedPlayer = null;
   document.getElementById('player-list-area').innerHTML =
     '<div class="no-players"><div class="emoji">🎰</div><p>Spinning Decade...</p></div>';
 
@@ -388,7 +422,7 @@ function rerollDecade() {
 
       state.currentSlotDecade = finalDecade;
       const candidates = getPlayersForTeamAndDecade(state.currentSlotTeam.id, finalDecade)
-        .filter(p => !state.draftedPlayerIds.has(p.id) && p.positions.some(pos => emptyPositions.includes(pos)));
+        .filter(p => !state.draftedPlayerIds.has(p.id));
 
       state.availablePlayers = candidates;
       decadeSlot.textContent = finalDecade;
@@ -404,6 +438,7 @@ function renderPlayerList(players) {
   const area = document.getElementById('player-list-area');
   const team = state.teams[state.currentTeamIdx];
   const emptyPositions = state.positions.filter((_, i) => team.players[i] === null);
+  state.availablePlayers = Array.isArray(players) ? players : [];
 
   if (!players || players.length === 0) {
     area.innerHTML = `
@@ -420,18 +455,39 @@ function renderPlayerList(players) {
 
   players.forEach(player => {
     const r = computePlayerRating(player);
+    const grade = ratingToGrade(r);
     const card = document.createElement('div');
     card.className = 'player-card';
+    
+    // Check if player has at least one position that is currently empty in the roster
+    const canDraft = player.positions.some(pos => emptyPositions.includes(pos));
+    if (!canDraft) {
+      card.classList.add('disabled-card');
+      card.draggable = false;
+    } else {
+      card.draggable = true;
+    }
+
     const primaryPos = player.positions[0];
     card.innerHTML = `
       <div class="player-avatar">${positionEmoji(primaryPos)}</div>
       <div class="player-info">
         <div class="player-name">${player.name}</div>
-        <div class="player-meta">${player.positions.join('/')} · ${player.ppg}pts ${player.rpg}reb ${player.apg}ast</div>
+        <div class="player-meta">${player.positions.join('/')}</div>
       </div>
-      <div class="player-rating" style="color:${ratingColor(r)}">${r}</div>
+      <div class="player-rating grade-badge" style="color:${gradeColor(grade)}">${grade}</div>
     `;
+
+    if (canDraft) {
+      card.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('application/json', JSON.stringify({ type: 'new_draft', playerId: player.id }));
+        card.classList.add('dragging');
+      });
+      card.addEventListener('dragend', () => card.classList.remove('dragging'));
+    }
+
     card.onclick = () => {
+      if (!canDraft) return;
       list.querySelectorAll('.player-card').forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
       state.selectedPlayer = player;
@@ -458,6 +514,12 @@ function renderPlayerList(players) {
   area.appendChild(list);
 }
 
+function refreshAvailablePlayerList() {
+  if (state.hasSpun && state.currentSlotTeam && state.currentSlotDecade && state.availablePlayers && state.availablePlayers.length > 0) {
+    renderPlayerList(state.availablePlayers);
+  }
+}
+
 function renderRoster(team) {
   const panel = document.getElementById('roster-panel');
   panel.innerHTML = '';
@@ -466,9 +528,10 @@ function renderRoster(team) {
   const hdr = document.createElement('div');
   hdr.className = 'roster-header';
   const rating = computeTeamRating(team.players);
+  const grade = rating > 0 ? ratingToGrade(rating) : '--';
   hdr.innerHTML = `
     <div class="roster-title">${team.name}</div>
-    <div class="team-rating-badge">⭐ ${rating || '--'}</div>
+    <div class="team-rating-badge">⭐ ${grade}</div>
   `;
   panel.appendChild(hdr);
 
@@ -477,21 +540,29 @@ function renderRoster(team) {
     const player = team.players[i];
     const slot = document.createElement('div');
     slot.className = `position-slot ${player ? 'filled' : ''}`;
-    slot.style.cursor = player ? 'pointer' : 'default';
+    slot.dataset.pos = pos;
 
     if (player) {
       const r = computePlayerRating(player);
+      const grade = ratingToGrade(r);
       slot.innerHTML = `
         <div class="pos-badge filled">${pos}</div>
         <div class="pos-info">
           <div class="pos-player-name">${player.name}</div>
-          <div class="pos-stats">${player.ppg}pts · ${player.rpg}reb · ${player.apg}ast</div>
-          <div style="font-size:0.65rem;color:var(--text-muted);margin-top:2px;">
-            Eligible: ${player.positions.join(', ')}
+          <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">
+            ${player.positions.join(', ')}
           </div>
         </div>
-        <div class="pos-rating" style="color:${ratingColor(r)}">${r}</div>
+        <div class="pos-rating grade-badge" style="color:${gradeColor(grade)}">${grade}</div>
       `;
+      slot.draggable = true;
+      slot.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('application/json', JSON.stringify({ type: 'roster_move', fromPos: pos }));
+        slot.classList.add('dragging');
+      });
+      slot.addEventListener('dragend', () => slot.classList.remove('dragging'));
+      
+      // Mobile fallback: click to swap
       slot.onclick = () => {
         openManageModal(player, pos, i);
       };
@@ -503,6 +574,39 @@ function renderRoster(team) {
         </div>
       `;
     }
+
+    // Drag over and Drop logic
+    slot.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      slot.classList.add('drag-over');
+    });
+    slot.addEventListener('dragleave', () => {
+      slot.classList.remove('drag-over');
+    });
+    slot.addEventListener('drop', (e) => {
+      e.preventDefault();
+      slot.classList.remove('drag-over');
+      const dataStr = e.dataTransfer.getData('application/json');
+      if (!dataStr) return;
+      try {
+        const data = JSON.parse(dataStr);
+        if (data.type === 'new_draft') {
+          if (team.players[i] !== null) {
+            showToast('⚠️ Position is filled! Move the player first.');
+            return;
+          }
+          const p = state.availablePlayers.find(pl => pl.id === data.playerId);
+          if (p && p.positions.includes(pos)) {
+            confirmPick(p, pos);
+          } else {
+            showToast('⚠️ Player is not eligible for ' + pos);
+          }
+        } else if (data.type === 'roster_move') {
+          handleRosterMove(data.fromPos, pos);
+        }
+      } catch (err) {}
+    });
+
     panel.appendChild(slot);
   });
 }
@@ -511,8 +615,19 @@ function confirmPick(player, pos) {
   const team = state.teams[state.currentTeamIdx];
   const posIdx = state.positions.indexOf(pos);
   
+  if (state.draftedPlayerIds.has(player.id)) return;
+  if (team.players[posIdx] !== null) return;
+  
   team.players[posIdx] = player;
   state.draftedPlayerIds.add(player.id);
+  state.availablePlayers = [];
+  state.selectedPlayer = null;
+  document.getElementById('draft-actions-container').innerHTML = '';
+  document.getElementById('player-list-area').innerHTML = `
+    <div class="no-players">
+      <div class="emoji">🎰</div>
+      <p>Spin the wheel to roll players for your team!</p>
+    </div>`;
   
   renderRoster(team);
   showToast(`✅ ${player.name} drafted to ${pos}!`);
@@ -548,6 +663,8 @@ function advanceDraft() {
   // Clear slots cache
   state.currentSlotTeam = null;
   state.currentSlotDecade = null;
+  state.availablePlayers = [];
+  state.selectedPlayer = null;
 
   updateDraftUI();
   updateRerollButtons();
@@ -591,20 +708,8 @@ function openManageModal(player, currentPos, currentIdx) {
     if (!otherPlayer) {
       btn.innerHTML = `Move to ${targetPos} <span class="badge">Empty</span>`;
       btn.onclick = () => {
-        team.players[targetIdx] = player;
-        team.players[currentIdx] = null;
-        
-        team.rating = computeTeamRating(team.players);
-        renderRoster(team);
-        
-        // Reset player selection to prevent obsolete slot assignments
-        state.selectedPlayer = null;
-        document.getElementById('draft-actions-container').innerHTML = '';
-        document.querySelectorAll('.player-card').forEach(c => c.classList.remove('selected'));
-        
-        updateDraftUI();
+        handleRosterMove(currentPos, targetPos);
         closeManageModal();
-        showToast(`Moved ${player.name} to ${targetPos}`);
       };
       container.appendChild(btn);
     } else {
@@ -612,20 +717,8 @@ function openManageModal(player, currentPos, currentIdx) {
       if (otherCanPlayCurrent) {
         btn.innerHTML = `Swap with ${otherPlayer.name} (${targetPos}) <span class="badge">Swap</span>`;
         btn.onclick = () => {
-          team.players[targetIdx] = player;
-          team.players[currentIdx] = otherPlayer;
-          
-          team.rating = computeTeamRating(team.players);
-          renderRoster(team);
-          
-          // Reset player selection to prevent obsolete slot assignments
-          state.selectedPlayer = null;
-          document.getElementById('draft-actions-container').innerHTML = '';
-          document.querySelectorAll('.player-card').forEach(c => c.classList.remove('selected'));
-          
-          updateDraftUI();
+          handleRosterMove(currentPos, targetPos);
           closeManageModal();
-          showToast(`Swapped ${player.name} and ${otherPlayer.name}`);
         };
         container.appendChild(btn);
       }
@@ -641,6 +734,51 @@ function openManageModal(player, currentPos, currentIdx) {
 
   modal.classList.add('active');
 }
+
+function handleRosterMove(fromPos, toPos) {
+  if (fromPos === toPos) return;
+  const team = state.teams[state.currentTeamIdx];
+  const fromIdx = state.positions.indexOf(fromPos);
+  const toIdx = state.positions.indexOf(toPos);
+  
+  const p1 = team.players[fromIdx];
+  const p2 = team.players[toIdx];
+  
+  if (!p1) return;
+  
+  // If moving to empty slot
+  if (!p2) {
+    if (!p1.positions.includes(toPos)) {
+      showToast(`⚠️ ${p1.name} cannot play ${toPos}!`);
+      return;
+    }
+    team.players[toIdx] = p1;
+    team.players[fromIdx] = null;
+    showToast(`✅ Moved to ${toPos}`);
+  } else {
+    // Swapping two players
+    if (!p1.positions.includes(toPos)) {
+      showToast(`⚠️ ${p1.name} cannot play ${toPos}!`);
+      return;
+    }
+    if (!p2.positions.includes(fromPos)) {
+      showToast(`⚠️ ${p2.name} cannot play ${fromPos}!`);
+      return;
+    }
+    team.players[toIdx] = p1;
+    team.players[fromIdx] = p2;
+    showToast(`✅ Swapped players!`);
+  }
+  
+  team.rating = computeTeamRating(team.players);
+  state.selectedPlayer = null;
+  document.getElementById('draft-actions-container').innerHTML = '';
+  document.querySelectorAll('.player-card').forEach(c => c.classList.remove('selected'));
+  
+  renderRoster(team);
+  refreshAvailablePlayerList();
+}
+
 
 function closeManageModal() {
   document.getElementById('modal-manage-player').classList.remove('active');
@@ -676,7 +814,7 @@ function showPhase1Results() {
       return `<div class="result-player-row">
         <span class="result-pos">${pos}</span>
         <span class="result-pname">${p.name}</span>
-        <span class="result-prating">${computePlayerRating(p)}</span>
+        <span class="result-prating">${ratingToGrade(computePlayerRating(p))}</span>
       </div>`;
     }).join('');
 
@@ -685,7 +823,7 @@ function showPhase1Results() {
       <div class="result-team-name">${team.name}</div>
       <div class="result-record">${recordString(team.record.wins, team.record.losses)}</div>
       <div class="result-record-sub">Regular Season</div>
-      <div class="result-rating">Team Rating: ${team.rating}</div>
+      <div class="result-rating">Team Grade: ${ratingToGrade(team.rating)}</div>
       <div class="divider" style="margin-top:12px;"></div>
       <div class="result-players">${playerRows}</div>
       ${isPlayoff ? '<div style="margin-top:12px;font-size:0.72rem;color:var(--gold);font-weight:700;">✓ PLAYOFF BOUND</div>' : ''}
@@ -803,17 +941,17 @@ function buildMatchupCard(matchup) {
     </div>
     <div class="matchup-teams">
       <div class="matchup-team home">
-        <div class="matchup-seed">#${homeIdx} Seed</div>
+        <div class="matchup-seed">#${homeIdx} Seed <span class="badge" style="background:#4cd964;color:#000;margin-left:4px;padding:2px 4px;">🏠 主場</span></div>
         <div class="matchup-team-name">${homeTeam.name}</div>
         <div class="matchup-record">${recordString(homeTeam.record.wins, homeTeam.record.losses)}</div>
-        <div class="matchup-rating">Rating: ${homeTeam.rating}</div>
+        <div class="matchup-rating">Grade: ${ratingToGrade(homeTeam.rating)}</div>
       </div>
       <div class="matchup-vs">VS</div>
       <div class="matchup-team away">
-        <div class="matchup-seed">#${awayIdx} Seed</div>
+        <div class="matchup-seed">#${awayIdx} Seed <span class="badge" style="background:#ff9500;color:#000;margin-left:4px;padding:2px 4px;">✈️ 客場</span></div>
         <div class="matchup-team-name">${awayTeam.name}</div>
         <div class="matchup-record">${recordString(awayTeam.record.wins, awayTeam.record.losses)}</div>
-        <div class="matchup-rating">Rating: ${awayTeam.rating}</div>
+        <div class="matchup-rating">Grade: ${ratingToGrade(awayTeam.rating)}</div>
       </div>
     </div>
     <div class="matchup-games">${gameDots}</div>
@@ -1012,7 +1150,7 @@ function showChampion() {
       return `<div class="result-player-row">
         <span class="result-pos">${pos}</span>
         <span class="result-pname">${p.name}</span>
-        <span class="result-prating">${computePlayerRating(p)}</span>
+        <span class="result-prating">${ratingToGrade(computePlayerRating(p))}</span>
       </div>`;
     }).join('');
 
